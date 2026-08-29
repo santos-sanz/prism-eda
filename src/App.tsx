@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import type { ChartKind, FilterOperator } from './data/types'
+import type { ChartKind, Dataset, FilterOperator } from './data/types'
 import { DatasetParseError, parseFile } from './data/parser'
-import { cpuHistogram, GpuAnalytics } from './gpu/webgpu'
+import { cpuHistogram, cpuSample, GpuAnalytics } from './gpu/webgpu'
 import { loadWorkspace, saveWorkspace } from './persistence/storage'
 import { WorkspaceController } from './analysis/workspace'
 import { ChartCard } from './components/ChartCard'
@@ -60,7 +60,7 @@ function App() {
   useEffect(() => {
     if (!state.dataset) return
     void saveWorkspace(state)
-  }, [state.revision, state.dataset?.id, state.dataset?.numericHistograms])
+  }, [state.revision, state.dataset?.id, state.dataset?.numericHistograms, state.dataset?.sampledRows])
 
   useEffect(() => {
     let active = true
@@ -73,21 +73,25 @@ function App() {
   }, [controller])
 
   useEffect(() => {
-    if (!state.dataset || state.dataset.numericHistograms || state.runtime.gpu === 'checking') return
+    const dataset = state.dataset
+    if (!dataset || dataset.numericHistograms || state.runtime.gpu === 'checking') return
     let active = true
-    const numericColumns = state.dataset.columns.filter((column) => column.kind === 'number').slice(0, 4)
+    const numericColumns = dataset.columns.filter((column) => column.kind === 'number').slice(0, 4)
     const prepare = async () => {
-      const histograms: NonNullable<typeof state.dataset>['numericHistograms'] = {}
+      const histograms: NonNullable<Dataset['numericHistograms']> = {}
+      const rowIndices = dataset.rows.map((_, index) => index)
+      const sampledIndices = gpuAnalytics ? await gpuAnalytics.sample(rowIndices) : cpuSample(rowIndices)
+      const sampledRows = sampledIndices.map((value) => dataset.rows[Math.round(value)]).filter((row): row is NonNullable<typeof row> => Boolean(row))
       if (gpuAnalytics) {
-        Object.assign(histograms, await gpuAnalytics.prepare(state.dataset!))
+        Object.assign(histograms, await gpuAnalytics.prepare(dataset))
       } else {
         for (const column of numericColumns) {
-          const values = state.dataset!.rows.map((row) => row[column.name]).filter((value): value is number => typeof value === 'number')
+          const values = dataset.rows.map((row) => row[column.name]).filter((value): value is number => typeof value === 'number')
           const histogram = cpuHistogram(values)
           if (histogram) histograms[column.name] = histogram
         }
       }
-      if (active && Object.keys(histograms).length) controller.attachNumericHistograms(histograms)
+      if (active && Object.keys(histograms).length) controller.attachNumericHistograms(histograms, sampledRows)
     }
     void prepare()
     return () => { active = false }

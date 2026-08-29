@@ -225,3 +225,9 @@ export function cpuHistogram(values: number[], binCount = 64): HistogramResult |
   for (const value of values) bins[Math.min(binCount - 1, Math.floor(((value - min) / span) * binCount))] += 1
   return { bins, min, max }
 }
+
+export function cpuSample<T>(values: T[], maxPoints = 600): T[] {
+  if (values.length <= maxPoints) return values
+  const stride = Math.ceil(values.length / maxPoints)
+  return values.filter((_, index) => index % stride === 0).slice(0, maxPoints)
+}

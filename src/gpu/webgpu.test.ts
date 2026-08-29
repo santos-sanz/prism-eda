@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cpuHistogram } from './webgpu'
+import { cpuHistogram, cpuSample } from './webgpu'
 
 describe('CPU analytics fallback', () => {
   it('creates stable bins equivalent to the GPU contract', () => {
@@ -12,5 +12,9 @@ describe('CPU analytics fallback', () => {
   it('returns null for an empty numeric column', () => {
     expect(cpuHistogram([])).toBeNull()
   })
-})
 
+  it('keeps deterministic bounded samples for dense arrays', () => {
+    expect(cpuSample(Array.from({ length: 1200 }, (_, index) => index), 600)).toHaveLength(600)
+    expect(cpuSample([1, 2, 3], 600)).toEqual([1, 2, 3])
+  })
+})

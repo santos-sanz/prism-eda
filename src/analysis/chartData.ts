@@ -41,9 +41,10 @@ export function aggregateChartData(dataset: Dataset, chart: ChartSpec, globalFil
 
 export function scatterData(dataset: Dataset, chart: ChartSpec, globalFilters: ChartSpec['filters']): ChartDatum[] {
   if (!chart.yColumn) return []
-  return chartRows(dataset, chart, globalFilters)
+  const hasFilters = globalFilters.length > 0 || chart.filters.length > 0
+  const rows = hasFilters ? chartRows(dataset, chart, globalFilters) : dataset.sampledRows ?? dataset.rows
+  return rows
     .map((row) => ({ label: String(row[chart.xColumn] ?? ''), value: numberValue(row[chart.xColumn]), secondary: numberValue(row[chart.yColumn!]) }))
     .filter((datum) => Number.isFinite(datum.value) && Number.isFinite(datum.secondary))
     .slice(0, 600)
 }
-

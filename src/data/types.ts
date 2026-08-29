@@ -25,6 +25,7 @@ export interface Dataset {
   previewRows: Row[]
   loadedAt: string
   numericHistograms?: Record<string, { bins: number[]; min: number; max: number }>
+  sampledRows?: Row[]
 }
 
 export type ChartKind = 'bar' | 'line' | 'area' | 'scatter' | 'donut'

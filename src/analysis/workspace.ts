@@ -56,9 +56,9 @@ export class WorkspaceController {
     this.notify()
   }
 
-  attachNumericHistograms(histograms: NonNullable<Dataset['numericHistograms']>) {
+  attachNumericHistograms(histograms: NonNullable<Dataset['numericHistograms']>, sampledRows?: Dataset['sampledRows']) {
     if (!this.state.dataset) return
-    this.state = { ...this.state, dataset: { ...this.state.dataset, numericHistograms: histograms } }
+    this.state = { ...this.state, dataset: { ...this.state.dataset, numericHistograms: histograms, ...(sampledRows ? { sampledRows } : {}) } }
     this.notify()
   }
 
