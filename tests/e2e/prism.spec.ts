@@ -13,9 +13,10 @@ test('loads sample data and exposes editable live views', async ({ page }) => {
   await expect(page.locator('[data-testid^="chart-card-"]')).toHaveCount(4)
   await expect(page.getByText('Shared control plane')).toBeVisible()
   await expect(page.getByText('workspace v')).toBeVisible()
+  await expect(page.locator('.global-filter-bar select')).toHaveValue('region')
 
   const firstChart = page.locator('[data-testid="chart-card-chart_1"]')
-  await firstChart.getByLabel('Type').selectOption('bar')
+  await firstChart.locator('.chart-controls select').first().selectOption('bar')
   await expect(firstChart.locator('.chart-chip')).toHaveText('bar')
 })
 
@@ -40,5 +41,6 @@ test('registers real WebMCP tools and mutates the shared canvas', async ({ page 
     await update?.execute({ chartId: 'chart_2', kind: 'scatter' })
   })
   await expect(page.locator('[data-testid="chart-card-chart_2"] .chart-chip')).toHaveText('scatter')
+  await expect(page.locator('[data-testid="chart-card-chart_2"] h3')).toHaveText('revenue vs margin')
   await expect(page.getByText('agent', { exact: false }).first()).toBeVisible()
 })

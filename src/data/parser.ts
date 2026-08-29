@@ -24,6 +24,7 @@ function parseScalar(value: unknown): Scalar {
   if (typeof value === 'number' || typeof value === 'boolean') return value
   const text = String(value).trim()
   if (!text) return null
+  if (/^(?:na|n\/a|null|none|nan|missing)$/i.test(text)) return null
   if (/^(true|false)$/i.test(text)) return text.toLowerCase() === 'true'
   if (/^-?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(text)) {
     const number = Number(text)

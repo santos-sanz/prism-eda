@@ -96,6 +96,16 @@ function numericValues(dataset: Dataset, column: string): number[] {
   return dataset.rows.map((row) => row[column]).filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
 }
 
+function numericRange(values: number[]): { min: number; max: number } {
+  let min = Number.POSITIVE_INFINITY
+  let max = Number.NEGATIVE_INFINITY
+  for (const value of values) {
+    if (value < min) min = value
+    if (value > max) max = value
+  }
+  return { min, max }
+}
+
 export class GpuAnalytics {
   private constructor(private readonly device: GPUDeviceLike) {}
 
@@ -114,8 +124,7 @@ export class GpuAnalytics {
 
   async histogram(values: number[]): Promise<HistogramResult | null> {
     if (!values.length) return null
-    const min = Math.min(...values)
-    const max = Math.max(...values)
+    const { min, max } = numericRange(values)
     try {
       const valueBuffer = this.device.createBuffer({ size: values.length * 4, usage: GPU_BUFFER_USAGE.STORAGE | GPU_BUFFER_USAGE.COPY_DST })
       const binsBuffer = this.device.createBuffer({ size: 64 * 4, usage: GPU_BUFFER_USAGE.STORAGE | GPU_BUFFER_USAGE.COPY_SRC | GPU_BUFFER_USAGE.COPY_DST })
@@ -218,8 +227,7 @@ export class GpuAnalytics {
 
 export function cpuHistogram(values: number[], binCount = 64): HistogramResult | null {
   if (!values.length) return null
-  const min = Math.min(...values)
-  const max = Math.max(...values)
+  const { min, max } = numericRange(values)
   const bins = Array.from({ length: binCount }, () => 0)
   const span = Math.max(max - min, 0.000001)
   for (const value of values) bins[Math.min(binCount - 1, Math.floor(((value - min) / span) * binCount))] += 1

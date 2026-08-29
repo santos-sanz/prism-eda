@@ -4,6 +4,7 @@ import { DatasetParseError, parseFile } from './data/parser'
 import { cpuHistogram, cpuSample, GpuAnalytics } from './gpu/webgpu'
 import { loadWorkspace, saveWorkspace } from './persistence/storage'
 import { WorkspaceController } from './analysis/workspace'
+import { defaultFilterColumn } from './analysis/suggestions'
 import { ChartCard } from './components/ChartCard'
 import { DatasetPanel } from './components/DatasetPanel'
 import { RuntimePanel } from './components/RuntimePanel'
@@ -98,8 +99,8 @@ function App() {
   }, [controller, gpuAnalytics, state.dataset?.id, state.dataset?.numericHistograms, state.runtime.gpu])
 
   useEffect(() => {
-    if (state.dataset && !globalFilterColumn) setGlobalFilterColumn(state.dataset.columns[0]?.name ?? '')
-  }, [state.dataset, globalFilterColumn])
+    if (state.dataset) setGlobalFilterColumn(defaultFilterColumn(state.dataset))
+  }, [state.dataset?.id])
 
   const importDataset = async (file: File) => {
     setLoading(true)

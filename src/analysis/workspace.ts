@@ -1,5 +1,5 @@
 import type { ActivityEntry, ChartKind, ChartSpec, Dataset, EdaToolResult, FilterOperator, FilterRule, RuntimeState, WorkspaceState } from '../data/types'
-import { columnOptionsForKind, suggestCharts } from './suggestions'
+import { chartNumericColumns, columnOptionsForKind, defaultFilterColumn, suggestCharts } from './suggestions'
 
 export type WorkspaceListener = (state: WorkspaceState) => void
 
@@ -24,6 +24,29 @@ export type SetFilterInput = {
   column: string
   operator: FilterOperator
   value: string | number
+}
+
+function isNumericColumn(dataset: Dataset, name: string): boolean {
+  return dataset.columns.some((column) => column.name === name && column.kind === 'number')
+}
+
+function numericColumnNames(dataset: Dataset): string[] {
+  return chartNumericColumns(dataset).map((column) => column.name)
+}
+
+function generatedChartTitle(kind: ChartKind, xColumn: string, yColumn?: string): string {
+  if (kind === 'donut') return `${xColumn} mix`
+  if (kind === 'scatter') return `${xColumn} vs ${yColumn ?? 'value'}`
+  if (kind === 'area') return `${yColumn ?? xColumn} distribution`
+  if (kind === 'line') return `${yColumn ?? 'Rows'} over ${xColumn}`
+  return `${yColumn ?? 'Rows'} by ${xColumn}`
+}
+
+function defaultXColumn(dataset: Dataset, kind: ChartKind, numericColumns: string[]): string | undefined {
+  const fallback = defaultFilterColumn(dataset)
+  if (kind === 'scatter' || kind === 'area') return (numericColumns[0] ?? fallback) || undefined
+  if (kind === 'line') return (dataset.columns.find((column) => column.kind === 'date')?.name ?? fallback) || undefined
+  return fallback || undefined
 }
 
 const initialRuntime: RuntimeState = { webmcp: 'unsupported', gpu: 'checking', registeredTools: [] }
@@ -81,18 +104,21 @@ export class WorkspaceController {
     const dataset = this.state.dataset
     if (!dataset) return this.fail('Load a dataset before creating a chart.')
     const kind = input.kind
-    const xColumn = input.xColumn ?? dataset.columns.find((column) => column.kind !== 'boolean')?.name
-    const yColumn = input.yColumn ?? dataset.columns.find((column) => column.kind === 'number')?.name
+    const numericColumns = numericColumnNames(dataset)
+    const xColumn = input.xColumn ?? defaultXColumn(dataset, kind, numericColumns)
+    const yColumn = input.yColumn ?? (kind === 'scatter' ? numericColumns.find((column) => column !== xColumn) : numericColumns[0])
     if (!xColumn || !dataset.columns.some((column) => column.name === xColumn)) return this.fail(`Unknown x-axis column: ${xColumn ?? '(missing)'}`)
     if (kind === 'scatter' && !yColumn) return this.fail('Scatter charts need both an x-axis and a y-axis column.')
+    if (kind === 'scatter' && !isNumericColumn(dataset, xColumn)) return this.fail(`Scatter x-axis must be numeric: ${xColumn}`)
+    if (kind === 'scatter' && xColumn === yColumn) return this.fail('Scatter charts need two different numeric columns for their axes.')
     if ((kind === 'scatter' || kind === 'bar' || kind === 'line' || kind === 'area') && yColumn) {
       const yProfile = dataset.columns.find((column) => column.name === yColumn)
       if (!yProfile) return this.fail(`Unknown y-axis column: ${yColumn}`)
-      if (kind === 'scatter' && yProfile.kind !== 'number') return this.fail(`Scatter y-axis must be numeric: ${yColumn}`)
+      if (yProfile.kind !== 'number') return this.fail(`${kind} y-axis must be numeric: ${yColumn}`)
     }
     const chart: ChartSpec = {
       id: `chart_${this.state.revision + this.state.charts.length + 1}`,
-      title: input.title ?? `${kind} · ${xColumn}`,
+      title: input.title ?? generatedChartTitle(kind, xColumn, yColumn),
       kind,
       xColumn,
       yColumn: kind === 'donut' ? undefined : yColumn,
@@ -113,16 +139,24 @@ export class WorkspaceController {
     if (!dataset) return this.fail('Load a dataset before editing charts.')
     if (!chart) return this.fail(`Chart ${input.chartId} does not exist.`)
     const kind = input.kind ?? chart.kind
-    const xColumn = input.xColumn ?? chart.xColumn
-    const yColumn = input.yColumn === null ? undefined : input.yColumn ?? chart.yColumn
+    let xColumn = input.xColumn ?? chart.xColumn
+    let yColumn = input.yColumn === null ? undefined : input.yColumn ?? chart.yColumn
+    if (kind === 'scatter') {
+      const numericColumns = numericColumnNames(dataset)
+      if (!isNumericColumn(dataset, xColumn) && input.xColumn === undefined) xColumn = numericColumns[0] ?? xColumn
+      if ((!yColumn || yColumn === xColumn) && input.yColumn === undefined) yColumn = numericColumns.find((column) => column !== xColumn)
+    }
     if (!dataset.columns.some((column) => column.name === xColumn)) return this.fail(`Unknown x-axis column: ${xColumn}`)
+    if (kind === 'scatter' && !isNumericColumn(dataset, xColumn)) return this.fail(`Scatter x-axis must be numeric: ${xColumn}`)
     if (yColumn) {
       const yProfile = dataset.columns.find((column) => column.name === yColumn)
       if (!yProfile) return this.fail(`Unknown y-axis column: ${yColumn}`)
-      if (kind === 'scatter' && yProfile.kind !== 'number') return this.fail(`Scatter y-axis must be numeric: ${yColumn}`)
+      if ((kind === 'scatter' || kind === 'bar' || kind === 'line' || kind === 'area') && yProfile.kind !== 'number') return this.fail(`${kind} y-axis must be numeric: ${yColumn}`)
     }
     if (kind === 'scatter' && !yColumn) return this.fail('Scatter charts need both an x-axis and a y-axis column.')
-    const next = { ...chart, ...input, kind, xColumn, yColumn: kind === 'donut' ? undefined : yColumn, title: input.title ?? chart.title, origin: source }
+    if (kind === 'scatter' && xColumn === yColumn) return this.fail('Scatter charts need two different numeric columns for their axes.')
+    const nextYColumn = kind === 'donut' ? undefined : yColumn
+    const next = { ...chart, kind, xColumn, yColumn: nextYColumn, title: input.title ?? generatedChartTitle(kind, xColumn, nextYColumn), sort: input.sort ?? chart.sort, origin: source }
     this.state = { ...this.state, charts: this.state.charts.map((item) => item.id === chart.id ? next : item), selectedChartId: chart.id, revision: this.state.revision + 1 }
     this.addActivity(source, 'update_chart', `${chart.title} → ${next.kind}`, 'success')
     return this.result(true, `Updated ${next.title}.`, next)

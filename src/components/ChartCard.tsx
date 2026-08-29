@@ -5,8 +5,9 @@ import { GridComponent, LegendComponent, TitleComponent, TooltipComponent } from
 import { CanvasRenderer } from 'echarts/renderers'
 import type { ChartKind, ChartSpec, Dataset, FilterOperator } from '../data/types'
 import { buildChartOption } from '../analysis/chartOption'
+import { chartRows } from '../analysis/chartData'
 import { filterLabel } from '../analysis/filters'
-import { columnOptionsForKind } from '../analysis/suggestions'
+import { columnOptionsForKind, defaultFilterColumn } from '../analysis/suggestions'
 
 echarts.use([BarChart, LineChart, PieChart, ScatterChart, GridComponent, LegendComponent, TitleComponent, TooltipComponent, CanvasRenderer])
 
@@ -32,11 +33,16 @@ const chartKinds: Array<{ value: ChartKind; label: string }> = [
 export function ChartCard({ chart, dataset, globalFilters, selected, onFocus, onUpdate, onFilter, onClearFilters }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const instanceRef = useRef<echarts.ECharts | null>(null)
-  const [filterColumn, setFilterColumn] = useState(dataset.columns[0]?.name ?? '')
+  const [filterColumn, setFilterColumn] = useState(defaultFilterColumn(dataset))
   const [filterOperator, setFilterOperator] = useState<FilterOperator>('equals')
   const [filterValue, setFilterValue] = useState('')
   const xOptions = useMemo(() => columnOptionsForKind(dataset.columns, chart.kind, 'x'), [dataset.columns, chart.kind])
   const yOptions = useMemo(() => columnOptionsForKind(dataset.columns, chart.kind, 'y'), [dataset.columns, chart.kind])
+  const visibleRowCount = chartRows(dataset, chart, globalFilters).length
+
+  useEffect(() => {
+    setFilterColumn(defaultFilterColumn(dataset))
+  }, [dataset.id])
 
   useEffect(() => {
     if (!containerRef.current) return
@@ -73,7 +79,7 @@ export function ChartCard({ chart, dataset, globalFilters, selected, onFocus, on
         <span className="chart-chip">{chart.kind}</span>
       </header>
       <p className="chart-reason">{chart.reason}</p>
-      <div ref={containerRef} className="chart-canvas" aria-label={`${chart.title} chart`} />
+      <div className="chart-stage"><div ref={containerRef} className="chart-canvas" aria-label={`${chart.title} chart`} />{visibleRowCount === 0 && <div className="chart-empty-state">No rows match the active filters.</div>}</div>
       <div className="chart-controls" onClick={(event) => event.stopPropagation()}>
         <label>
           <span>Type</span>

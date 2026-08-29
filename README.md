@@ -5,10 +5,10 @@ Prism EDA is a local-first exploratory data analysis workspace for the WebMCP er
 ## What is in the MVP
 
 - CSV and JSON parsing in a Web Worker, with a 25 MB / 250,000 row guardrail.
-- Automatic column profiling and deterministic chart suggestions.
+- Automatic column profiling with nulls, ranges, examples, and deterministic suggestions that avoid identifiers and high-cardinality text.
 - Bar, line, area, scatter, and donut views powered by Apache ECharts.
 - Local workspace persistence through IndexedDB; source data is not uploaded.
-- WebGPU compute for numeric histograms and sampling when the browser supports it, with a CPU fallback.
+- WebGPU compute for numeric histograms and scatter sampling when the browser supports it, with a CPU fallback.
 - A real `document.modelContext.registerTool()` surface with typed dataset, chart, filter, and focus tools.
 - An Agent Runtime panel showing capability state and the shared activity trace.
 

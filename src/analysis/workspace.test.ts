@@ -20,5 +20,21 @@ describe('WorkspaceController', () => {
     expect(controller.getState().revision).toBeGreaterThan(before)
     expect(controller.getState().globalFilters).toHaveLength(1)
   })
-})
 
+  it('keeps scatter axes numeric when switching from a categorical chart', () => {
+    const controller = new WorkspaceController()
+    controller.loadDataset(parseStructuredText('region,revenue,orders\nNorth,10,2\nSouth,20,4', 'x.csv', 'csv'))
+    const chartId = controller.getState().charts[0].id
+    const result = controller.updateChart({ chartId, kind: 'scatter' }, 'human')
+    expect(result.ok).toBe(true)
+    expect(controller.getState().charts.find((chart) => chart.id === chartId)).toMatchObject({ kind: 'scatter', title: 'revenue vs orders', xColumn: 'revenue', yColumn: 'orders' })
+  })
+
+  it('uses a useful dimension when creating a fresh chart', () => {
+    const controller = new WorkspaceController()
+    controller.loadDataset(parseStructuredText('Id,region,revenue\n1,North,10\n2,South,20', 'x.csv', 'csv'))
+    const result = controller.createChart({ kind: 'bar' }, 'agent')
+    expect(result.ok).toBe(true)
+    expect(controller.getState().charts.at(-1)).toMatchObject({ xColumn: 'region', yColumn: 'revenue', title: 'revenue by region' })
+  })
+})

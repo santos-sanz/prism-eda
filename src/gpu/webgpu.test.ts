@@ -17,4 +17,9 @@ describe('CPU analytics fallback', () => {
     expect(cpuSample(Array.from({ length: 1200 }, (_, index) => index), 600)).toHaveLength(600)
     expect(cpuSample([1, 2, 3], 600)).toEqual([1, 2, 3])
   })
+
+  it('computes dense histograms without spreading a large argument list', () => {
+    const histogram = cpuHistogram(Array.from({ length: 250_000 }, (_, index) => index % 1000))
+    expect(histogram?.bins.reduce((sum, value) => sum + value, 0)).toBe(250_000)
+  })
 })
